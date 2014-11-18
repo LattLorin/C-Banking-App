@@ -13,22 +13,36 @@
 
 int TbSchemaNameGet(void);
 int TbColumnInfoGet(void);
+int mainScreen(void);
+//int newCust(char* theName, char* theGender, int theAge, int thePin);
 
 EXEC SQL BEGIN DECLARE SECTION;
   char custTable[128];
   char accTable[128];
   char schemaName[128];
-  char columnName[20];
-  char dataType[14];
+  char columnName[128];
+  sqlint32 dataType;
+
+  sqlint32 custId;
+  char custName[15];
+  char custGender[1];
+  sqlint32 custAge;
+  sqlint32 custPin;
+
+  sqlint32 accNum;
+  sqlint32 accBal;
+  sqlint32 accType;
+  sqlint32 accStat;
+
   sqlint32 dataLength;
   short dataScale;
   char dbAlias[15];
-  char user[129];
-  char pswd[15];
+  char strstmt[512];
 EXEC SQL END DECLARE SECTION;
 
-int main(int argc, char *argv[])
-{
+EXEC SQL INCLUDE SQLCA;
+
+int main(int argc, char *argv[]) {
   int rc = 0;
   struct sqlca sqlca;
 
@@ -47,44 +61,16 @@ int main(int argc, char *argv[])
 
     strcpy(custTable, "CUSTOMER");
     strcpy(accTable, "ACCOUNT");
+    strcpy(schemaName, "CRR");
 
-    rc = TbSchemaNameGet();
-    rc = TbColumnInfoGet();
+    rc = mainScreen();
+    //rc = TbColumnInfoGet();
 
     /* disconnect from the database */
     EXEC SQL CONNECT RESET;
   }
     return 0;
 } /* end main */
-
-int TbSchemaNameGet(void) {
-  struct sqlca sqlca;
-
-  printf("\n-----------------------------------------------------------");
-  printf("\nUSE THE SQL STATEMENT:\n");
-  printf("  SELECT INTO\n");
-  printf("TO GET A TABLE SCHEMA NAME.\n");
-
-  /* get the table schema name */
-  printf("\n  Execute the statement\n");
-  printf("    SELECT tabschema INTO :schemaName\n");
-  printf("      FROM syscat.tables\n");
-  printf("      WHERE tabname = :custTable\n");
-  printf("  for\n");
-  printf("    tableName = '%s'.\n", custTable);
-
-  EXEC SQL SELECT tabschema INTO :schemaName
-    FROM syscat.tables
-    WHERE tabname = :custTable;
-/*  EMB_SQL_CHECK("Table schema name -- Get"); */
-
-  /* get rid of spaces from the end of schemaName */
-  strtok(schemaName, " ");
-
-  printf("\nTable schema name is: %s\n", schemaName);
-
-  return 0;
-}
 
 int TbColumnInfoGet(void) {
   struct sqlca sqlca;
@@ -109,10 +95,8 @@ int TbColumnInfoGet(void) {
       WHERE tabschema = :schemaName AND tabname = :custTable;
 
   EXEC SQL OPEN c1;
-  /* EMB_SQL_CHECK("Cursor -- Open"); */
 
   EXEC SQL FETCH c1 INTO :columnName, :dataType, :dataLength, :dataScale;
-  /* EMB_SQL_CHECK("Cursor -- Fetch"); */
 
   if (sqlca.sqlcode == 100)
   {
@@ -132,11 +116,91 @@ int TbColumnInfoGet(void) {
     }
 
     EXEC SQL FETCH c1 INTO :columnName, :dataType, :dataLength, :dataScale;
-    /* EMB_SQL_CHECK("Cursor -- Fetch"); */
   }
 
   EXEC SQL CLOSE c1;
-  /* EMB_SQL_CHECK("Cursor -- Close"); */
 
   return 0;
 } /* TbColumnInfoGet */
+
+int opt;
+
+int mainScreen(void) {
+  int done = 1;
+  while (done) {
+    printf("\nWelcome to the Self Service Banking System!");
+    printf("\n1. New Customer");
+    printf("\n2. Customer Login");
+    printf("\n3. Exit\n");
+      /*Get user input*/
+    scanf("%d", &opt);
+    //int id = -1;
+    switch (opt) {
+      case 1:
+        //Prompt for Name Gender Age and Pin, return Id if successful
+        printf("Name: ");
+        scanf("%s", &custName);//Name
+        printf("Gender (M/F): ");
+        scanf("%s", &custGender);//Gendr
+        printf("Age: ");
+        scanf("%d", &custAge);//Age
+        printf("Pin: ");
+        scanf("%d", &custPin);//Pin
+        
+        //Do db call with an insert then return id
+        custId = newCust();//, gender, age, pin);
+        printf("\nYOUR ID IS: %d\n", custId);
+        break;
+      case 2:
+        //Prompt for customer ID and pin to authenticate,
+        //if customer enters 0 for ID and pin go to screen #4
+        printf("ID: ");
+        scanf("%d", &custId);
+
+        printf("Pin: ");
+        int custPin = scanf("%d", &custPin);
+        //if (custId == 0 && custPin == 0) {
+        //  adminLogin(stmt);
+        //}
+        //else if (authenticated(custId, custPin, stmt)) {
+        //  customerScreen(custId, custPin, stmt);
+        //} else {
+        //  printf("WRONG ID OR PIN.");
+        //}
+        break;
+      case 3:
+        //Exit
+        done = 0;
+        break;
+      default:
+        printf("Please choose a valid option (1, 2, or 3).");
+        break;
+    }
+  }
+  return 0;
+}
+
+int newCust (){
+
+  int rc = 0;
+  //This works
+  char sql[512]; 
+  sprintf(sql, "INSERT INTO CUSTOMER (NAME, GENDER, AGE, PIN) "
+               "VALUES ('%s','%s',%d,%d)", custName, custGender, custAge, custPin);
+  strcpy(strstmt, sql);
+  EXEC SQL EXECUTE IMMEDIATE :strstmt;
+  EXEC SQL COMMIT;
+
+  printf("Commited %s, %s, %d, %d\n", custName, custGender, custAge, custPin);
+
+  EXEC SQL DECLARE c2 CURSOR FOR
+    SELECT id
+    FROM customer
+    WHERE name = :custName AND pin = :custPin;
+
+  EXEC SQL OPEN c2;
+  EXEC SQL FETCH c2 INTO :custId;
+  EXEC SQL CLOSE c2;
+  
+    return custId;
+}
