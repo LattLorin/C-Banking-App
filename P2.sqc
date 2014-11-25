@@ -9,12 +9,7 @@
 #include <string.h>
 #include <sqlenv.h>
 #include <sqlutil.h>
-// #include "utilemb.h"
-
-int TbSchemaNameGet(void);
-int TbColumnInfoGet(void);
-int mainScreen(void);
-//int newCust(char* theName, char* theGender, int theAge, int thePin);
+//#include "utilemb.h"
 
 EXEC SQL BEGIN DECLARE SECTION;
   char custTable[128];
@@ -28,6 +23,10 @@ EXEC SQL BEGIN DECLARE SECTION;
   char custGender[1];
   sqlint32 custAge;
   sqlint32 custPin;
+
+  sqlint32 totalBal;
+  sqlint32 accNum;
+  sqlint32 balance;
 
   sqlint32 accNum;
   sqlint32 accBal;
@@ -73,21 +72,6 @@ int main(int argc, char *argv[]) {
 } /* end main */
 
 int TbColumnInfoGet(void) {
-  struct sqlca sqlca;
-
-  printf("\n-----------------------------------------------------------");
-  printf("\nUSE THE SQL STATEMENTS:\n");
-  printf("  DECLARE CURSOR\n");
-  printf("  OPEN\n");
-  printf("  FETCH\n");
-  printf("  CLOSE\n");
-  printf("TO GET TABLE COLUMN INFO.\n");
-
-  /* get info for table columns */
-  printf("\n  Get info for '%s.%s' table columns:\n",
-         schemaName, custTable);
-  printf("\n    column name          data type      data size\n");
-  printf("    -------------------- -------------- ----------\n");
 
   EXEC SQL DECLARE c1 CURSOR FOR
     SELECT colname, typename, length, scale
@@ -140,15 +124,29 @@ int mainScreen(void) {
         //Prompt for Name Gender Age and Pin, return Id if successful
         printf("Name: ");
         scanf("%s", &custName);//Name
-        printf("Gender (M/F): ");
-        scanf("%s", &custGender);//Gendr
-        printf("Age: ");
-        scanf("%d", &custAge);//Age
-        printf("Pin: ");
-        scanf("%d", &custPin);//Pin
-        
+        int correct = 1;
+        while (correct) {
+          printf("Gender (M/F): ");
+          scanf("%s", &custGender);//Gendr
+          if ((strncmp(custGender, "M", 10) == 0) || (strncmp(custGender, "F", 10) == 0)) {correct = 0;}
+          else {printf("Incorrect input %s\n", custGender);}
+        }
+        correct = 1;
+        while (correct) {
+          printf("Age: ");
+          scanf("%d", &custAge);//Age
+          if (custAge > 0) {correct = 0;}
+          else {printf("Invalid age must be greater than 0\n");}
+        }
+        correct = 1;
+        while (correct) {
+          printf("Pin: ");
+          scanf("%d", &custPin);//Pin
+          if (custPin > 0) {correct = 0;}
+          else {printf("Invalid pin: must be greater than 0\n");}
+        }
         //Do db call with an insert then return id
-        custId = newCust();//, gender, age, pin);
+        custId = newCust();
         printf("\nYOUR ID IS: %d\n", custId);
         break;
       case 2:
@@ -158,10 +156,10 @@ int mainScreen(void) {
         scanf("%d", &custId);
 
         printf("Pin: ");
-        int custPin = scanf("%d", &custPin);
-        //if (custId == 0 && custPin == 0) {
-        //  adminLogin(stmt);
-        //}
+        scanf("%d", &custPin);
+        if (custId == 0 && custPin == 0) {
+          adminLogin();
+        }
         //else if (authenticated(custId, custPin, stmt)) {
         //  customerScreen(custId, custPin, stmt);
         //} else {
@@ -180,18 +178,13 @@ int mainScreen(void) {
   return 0;
 }
 
-int newCust (){
-
+int newCust () {
   int rc = 0;
-  //This works
-  char sql[512]; 
-  sprintf(sql, "INSERT INTO CUSTOMER (NAME, GENDER, AGE, PIN) "
-               "VALUES ('%s','%s',%d,%d)", custName, custGender, custAge, custPin);
-  strcpy(strstmt, sql);
-  EXEC SQL EXECUTE IMMEDIATE :strstmt;
-  EXEC SQL COMMIT;
 
-  printf("Commited %s, %s, %d, %d\n", custName, custGender, custAge, custPin);
+  EXEC SQL INSERT INTO CUSTOMER (NAME, GENDER, AGE, PIN) 
+  VALUES (:custName, :custGender, :custAge, :custPin);
+
+  //printf("Commited %s, %s, %d, %d\n", custName, custGender, custAge, custPin);
 
   EXEC SQL DECLARE c2 CURSOR FOR
     SELECT id
@@ -202,5 +195,72 @@ int newCust (){
   EXEC SQL FETCH c2 INTO :custId;
   EXEC SQL CLOSE c2;
   
-    return custId;
+  return custId;
+}
+
+int adminLogin() {
+  int done = 1;
+  int id = -1;
+  while (done) {
+    printf("Administrator Main Menu");
+    printf("\n1. Account Summary for a Customer");
+    printf("\n2. Report A :: Customer Information with Total Balance in Decreasing Order");
+    printf("\n3. Report B :: Find the Average Total Balance Between Age Groups");
+    printf("\n4. Exit\n");
+    
+    scanf("%d", &opt);
+    switch (opt) {
+      case 1:
+        //Get account summary for a customer, provide a customer id
+        printf("ID: ");
+        scanf("%d", &id);
+        accSummary(id);
+        break;
+      case 2:
+        //You would display customer Id, Name, age, gender and total balance
+        //System.out.print("ID: ");
+        //id = in.nextInt();
+        //custInfo(stmt);//id, stmt);
+        break;
+      case 3: 
+        //Find average total balance between age groups
+        /*int minAge, maxAge;
+        printf("Min age: ");
+        scanf("%d", &minAge);
+        printf("Max age: ");
+        scanf("%d", &maxAge);
+        avgTotalBal(minAge, maxAge);*/
+        break;
+      case 4:
+        //Exit
+        done = 0;
+        break;
+      default:
+        printf("Please choose a valid option (1, 2, 3, or 4).\n");
+      }
+    }
+    return 0;
+}
+
+int accSummary(int anId) {
+  custId = anId;
+  EXEC SQL SELECT sum(balance) INTO :totalBal
+    FROM account
+    WHERE id = :custId;
+
+  printf("TOTAL BALANCE\tACCOUNT\tBALANCE\n");
+
+  EXEC SQL DECLARE c3 CURSOR FOR
+  SELECT NUMBER, BALANCE
+  FROM ACCOUNT
+  WHERE ID = :custId AND STATUS = 'A';
+
+  EXEC SQL OPEN c3;
+  printf("%d",totalBal);
+  while (1) {
+        EXEC SQL FETCH c3 INTO :accNum, :balance;
+        if (SQLCODE != 0) break;
+         printf("\t\t%d\t%d\n", accNum, balance);
+  }
+  EXEC SQL CLOSE c3;
 }
