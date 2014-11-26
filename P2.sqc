@@ -160,9 +160,9 @@ int mainScreen(void) {
         if (custId == 0 && custPin == 0) {
           adminLogin();
         }
-        //else if (authenticated(custId, custPin, stmt)) {
-        //  customerScreen(custId, custPin, stmt);
-        //} else {
+        else if (authenticated(custId, custPin)) {
+          customerScreen(custId, custPin);
+        }// else {
         //  printf("WRONG ID OR PIN.");
         //}
         break;
@@ -179,21 +179,9 @@ int mainScreen(void) {
 }
 
 int newCust () {
-  int rc = 0;
-
-  EXEC SQL INSERT INTO CUSTOMER (NAME, GENDER, AGE, PIN) 
-  VALUES (:custName, :custGender, :custAge, :custPin);
-
-  //printf("Commited %s, %s, %d, %d\n", custName, custGender, custAge, custPin);
-
-  EXEC SQL DECLARE c2 CURSOR FOR
-    SELECT id
-    FROM customer
-    WHERE name = :custName AND pin = :custPin;
-
-  EXEC SQL OPEN c2;
-  EXEC SQL FETCH c2 INTO :custId;
-  EXEC SQL CLOSE c2;
+  EXEC SQL SELECT ID INTO :custId 
+  FROM FINAL TABLE (INSERT INTO CUSTOMER (NAME, GENDER, AGE, PIN) 
+  VALUES (:custName, :custGender, :custAge, :custPin));
   
   return custId;
 }
@@ -218,8 +206,8 @@ int adminLogin() {
         break;
       case 2:
         //You would display customer Id, Name, age, gender and total balance
-        //System.out.print("ID: ");
-        //id = in.nextInt();
+        printf("ID: ");
+        scanf("%d", &id);
         //custInfo(stmt);//id, stmt);
         break;
       case 3: 
@@ -263,4 +251,144 @@ int accSummary(int anId) {
          printf("\t\t%d\t%d\n", accNum, balance);
   }
   EXEC SQL CLOSE c3;
+  return 1;
+}
+
+int authenticated(int id, int pin) {
+  EXEC SQL BEGIN DECLARE SECTION;
+  sqlint32 thePin = -1;
+  EXEC SQL END DECLARE SECTION;
+
+  custId = id;
+  EXEC SQL SELECT PIN INTO :thePin
+  FROM CUSTOMER
+  WHERE ID = :custId;
+
+  return thePin == pin ? 1 : 0;
+}
+
+int customerScreen(int theId, int custPin) {
+    int done = 1;
+    int thisBalance = -1, account = -1, accNum2 = -1, id = -1, amount = -1;
+    char accType[2];
+    while (done) {
+      printf("Customer Main Menu"
+          "\n1. Open Account"
+          "\n2. Close Account"
+          "\n3. Deposit"
+          "\n4. Withdraw"
+          "\n5. Transfer"
+          "\n6. Account Summary"
+          "\n7. Exit\n");
+      scanf("%d", &opt);
+      switch (opt) {
+      case 1:
+        //Prompt for id, account type, initial balance
+        //returns account number if successful.
+        printf("Enter an ID: ");
+        scanf("%d", &id);
+        printf("What type of account (C)hecking, or (S)avings: ");
+        scanf("%s", &accType);
+        printf("Enter your initial balance: ");
+        scanf("%d", &thisBalance);
+        account = newAccount(id, accType, thisBalance);
+        printf("\nYour account number is: %d\n", account);
+        break;
+      case 2:
+        //Prompt for account number, then change the status to I
+        //and empty the account balance
+        printf("Enter an account number: ");
+        scanf("%d", &account);
+        closeAccount(theId, account);
+        break;
+      /*case 3:
+        //Prompt for account number and amount to deposit
+        System.out.print("Enter an account number: ");
+        accNum = in.nextInt();
+        System.out.print("Enter the amount to deposit: ");
+        amount = in.nextInt();
+        deposit(accNum, amount, stmt);
+        break;
+      case 4:
+        //prompt for account number and amount to withdraw
+        System.out.print("Enter your account number: ");
+        accNum = in.nextInt();
+        System.out.print("Enter the amount to withdraw: ");
+        amount = in.nextInt();
+        if (!validAcc(accNum, stmt)) {
+          System.out.println("Invalid account number.");
+        } else {
+          withdraw(custId, accNum, amount, stmt);
+        }
+        break;
+      case 5: 
+        //prompt for the source and destination account number and amount
+        System.out.print("Enter source account number: ");
+        accNum = in.nextInt();
+        System.out.print("Enter destination account number: ");
+        accNum2 = in.nextInt();
+        System.out.print("Enter transfer amount: ");
+        amount = in.nextInt();
+        if (validAcc(accNum, stmt) && validAcc(accNum2, stmt)) {
+          transfer(custId, accNum, accNum2, amount, stmt);
+        } else {
+          System.out.println("Invalid account number(s).");
+        }
+        break;
+      case 6:
+        //The total balance and each account number and its balance
+        //that belong to the same customer
+        accSummary(custId, stmt);
+        break;*/
+      case 7:
+        //Go back to the previous screen
+        done = 0;
+        break;
+      default:
+        printf("Please choose a valid option (1, 2, 3, 4, 5, 6, or 7).\n");
+        break;
+      }
+    }
+    return 1;
+  }
+
+int newAccount(int id, char accType[2], int inBalance) {
+  EXEC SQL BEGIN DECLARE SECTION;
+  sqlint32 thisId;
+  char type[2];
+  sqlint32 initialBal;
+  sqlint32 thisAccNum;
+  EXEC SQL END DECLARE SECTION;
+
+  thisId = id;
+  strcpy(type, accType);
+  initialBal = inBalance;
+
+  printf("ID: %d, AccType: %s, InBal: %d\n", thisId, type, initialBal);
+
+  EXEC SQL SELECT NUMBER INTO :thisAccNum
+  FROM FINAL TABLE (INSERT INTO ACCOUNT (ID, BALANCE, TYPE, STATUS)
+  VALUES (:thisId, :initialBal, :type, 'A'));
+
+  return thisAccNum;
+}
+
+int closeAccount(int id, int account) {
+  if (isOwner(id, account)) {
+    accNum = account;
+    EXEC SQL UPDATE ACCOUNT SET STATUS = 'I', BALANCE = 0
+    WHERE NUMBER = :accNum;
+    printf("Account %d has been closed.\n\n", accNum);
+  } else {
+    printf("You are not the owner of %d\n\n", accNum);
+  }
+  return 1;
+}
+
+int isOwner(int id, int account) {
+  accNum = account;
+  EXEC SQL SELECT ID INTO :custId 
+  FROM ACCOUNT WHERE NUMBER = :accNum;
+    
+  return id == custId ? 1 : 0;
 }
