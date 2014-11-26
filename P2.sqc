@@ -301,41 +301,41 @@ int customerScreen(int theId, int custPin) {
         scanf("%d", &account);
         closeAccount(theId, account);
         break;
-      /*case 3:
+      case 3:
         //Prompt for account number and amount to deposit
-        System.out.print("Enter an account number: ");
-        accNum = in.nextInt();
-        System.out.print("Enter the amount to deposit: ");
-        amount = in.nextInt();
-        deposit(accNum, amount, stmt);
+        printf("Enter an account number: ");
+        scanf("%d", &account);
+        printf("Enter the amount to deposit: ");
+        scanf("%d", &amount);
+        deposit(account, amount);
         break;
       case 4:
         //prompt for account number and amount to withdraw
-        System.out.print("Enter your account number: ");
-        accNum = in.nextInt();
-        System.out.print("Enter the amount to withdraw: ");
-        amount = in.nextInt();
-        if (!validAcc(accNum, stmt)) {
-          System.out.println("Invalid account number.");
+        printf("Enter your account number: ");
+        scanf("%d", &account);
+        printf("Enter the amount to withdraw: ");
+        scanf("%d", &amount);
+        if (!isOwner(theId, account)) {
+          printf("You cannot withdraw from %d.\n\n", account);
         } else {
-          withdraw(custId, accNum, amount, stmt);
+          withdraw(theId, account, amount);
         }
         break;
       case 5: 
         //prompt for the source and destination account number and amount
-        System.out.print("Enter source account number: ");
-        accNum = in.nextInt();
-        System.out.print("Enter destination account number: ");
-        accNum2 = in.nextInt();
-        System.out.print("Enter transfer amount: ");
-        amount = in.nextInt();
-        if (validAcc(accNum, stmt) && validAcc(accNum2, stmt)) {
-          transfer(custId, accNum, accNum2, amount, stmt);
+        printf("Enter source account number: ");
+        scanf("%d", &account);
+        printf("Enter destination account number: ");
+        scanf("%d", &accNum2);
+        printf("Enter transfer amount: ");
+        scanf("%d", &amount);
+        if (validAcc(accNum) && validAcc(accNum2)) {
+          transfer(theId, account, accNum2, amount);
         } else {
-          System.out.println("Invalid account number(s).");
+          printf("Invalid account number(s).\n");
         }
         break;
-      case 6:
+      /*case 6:
         //The total balance and each account number and its balance
         //that belong to the same customer
         accSummary(custId, stmt);
@@ -391,4 +391,66 @@ int isOwner(int id, int account) {
   FROM ACCOUNT WHERE NUMBER = :accNum;
     
   return id == custId ? 1 : 0;
+}
+
+int deposit(int account, int amt) {
+  EXEC SQL BEGIN DECLARE SECTION;
+  sqlint32 bal;
+  EXEC SQL END DECLARE SECTION;
+
+  accNum = account;
+  if (amt < 0) {
+    printf("Cannot deposit negative amounts.\n");
+  } else {
+    bal = amt;
+    EXEC SQL UPDATE ACCOUNT SET BALANCE = (
+    SELECT BALANCE FROM ACCOUNT WHERE NUMBER = :accNum) + :bal 
+    WHERE NUMBER = :accNum;
+  }
+
+  return 1;
+}
+
+int withdraw(int id, int account, int amt) {
+  EXEC SQL BEGIN DECLARE SECTION;
+  sqlint32 bal;
+  EXEC SQL END DECLARE SECTION;
+
+  accNum = account;
+
+  EXEC SQL SELECT BALANCE INTO :bal
+  FROM ACCOUNT
+  WHERE NUMBER = :accNum;
+
+  if (amt < 0) {
+    printf("Cannot deposit negative amounts.\n");
+  } else if ((bal - amt) < 0) {
+    printf("Not enough funds to withdraw %d\n", amt);
+  } else {
+    bal = amt;
+    EXEC SQL UPDATE ACCOUNT SET BALANCE = (
+    SELECT BALANCE FROM ACCOUNT WHERE NUMBER = :accNum) - :bal
+    WHERE NUMBER = :accNum;
+  }
+  return 1;
+}
+
+int validAcc(int account){
+
+  accNum = account;
+  EXEC SQL SELECT ID INTO :custId
+  FROM ACCOUNT 
+  WHERE NUMBER = :accNum AND STATUS = 'A';
+
+  return custId >= 100 ? 1 : 0;
+}
+
+int transfer(int id, int acc1, int acc2, int amt) {
+  if (isOwner(id, acc1)) {
+    withdraw(id, acc1, amt);
+    deposit(acc2, amt);
+  } else {
+    printf("You cannot transfer from an account that you do not own.\n");
+  }
+  return 1;
 }
