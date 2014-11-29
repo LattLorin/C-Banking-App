@@ -161,7 +161,7 @@ int adminLogin() {
         scanf("%d", &minAge);
         printf("Max age: ");
         scanf("%d", &maxAge);
-        //avgTotalBal(minAge, maxAge);
+        avgTotalBal(minAge, maxAge);
         break;
       case 4:
         //Exit
@@ -198,6 +198,33 @@ int custInfo() {
       printf("%d\t%s\t\t%d\t%s\t%d\n", custId, custName, custAge, custGender, balance);
   }
   EXEC SQL CLOSE c4;
+  return 1;
+}
+
+int avgTotalBal(int minAge, int maxAge) {
+  EXEC SQL BEGIN DECLARE SECTION;
+  sqlint32 lower;
+  sqlint32 upper;
+  EXEC SQL END DECLARE SECTION;
+
+  lower = minAge;
+  upper = maxAge;
+
+  EXEC SQL DECLARE c5 CURSOR FOR
+  SELECT AVG(AGE) AS AGE, AVG(BALANCE) AS BALANCE
+  FROM CUSTOMER AS C, ACCOUNT AS A
+  WHERE C.AGE >= :lower AND C.AGE <= :upper
+  AND STATUS = 'A';
+
+  EXEC SQL OPEN c5;
+
+  printf("AVERAGE AGE\tAVERAGE BALANCE\n");
+  while (1) {
+    EXEC SQL FETCH c5 INTO :custAge, :balance;
+    if (SQLCODE != 0) break;
+    printf("%d\t\t%d\n\n", custAge, balance);
+  }
+  EXEC SQL CLOSE c5;
   return 1;
 }
 
