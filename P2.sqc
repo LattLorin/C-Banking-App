@@ -153,9 +153,7 @@ int adminLogin() {
         break;
       case 2:
         //You would display customer Id, Name, age, gender and total balance
-        printf("ID: ");
-        scanf("%d", &id);
-        //custInfo(stmt);//id, stmt);
+        custInfo();//id, stmt);
         break;
       case 3: 
         //Find average total balance between age groups
@@ -174,6 +172,33 @@ int adminLogin() {
       }
     }
     return 0;
+}
+
+int custInfo() {
+  EXEC SQL DECLARE c4 CURSOR FOR
+  SELECT C.ID, NAME, AGE, GENDER, SUM(BALANCE) AS BALANCE
+  FROM CUSTOMER AS C, ACCOUNT AS A
+  WHERE C.ID = A.ID AND STATUS = 'A'
+  GROUP BY C.ID, NAME, AGE, GENDER
+  ORDER BY BALANCE DESC;
+
+  printf("ID\tNAME\t\tAGE\tGENDER\tTOTAL BALANCE\n");
+  
+  EXEC SQL OPEN c4;
+  int running = 1;
+  while (running) {
+    EXEC SQL FETCH c4 INTO :custId, :custName, :custAge, :custGender, :balance;
+    if (SQLCODE != 0) {
+      running = 0;
+      break;
+    }
+    if (strlen(custName) >= 10)
+      printf("%d\t%s\t%d\t%s\t%d\n", custId, custName, custAge, custGender, balance);
+    else 
+      printf("%d\t%s\t\t%d\t%s\t%d\n", custId, custName, custAge, custGender, balance);
+  }
+  EXEC SQL CLOSE c4;
+  return 1;
 }
 
 int accSummary(int anId) {
